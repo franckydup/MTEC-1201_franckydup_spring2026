@@ -4,28 +4,28 @@ By Francky Duperval
 */
 
 function setup() {
-
-  // Creating Canvas and Background
   createCanvas(400, 400);
   background(250);
+}
 
+function draw() {
+  background(250);
+  
   // Creating left accelerator beam
-  ellipse(100, 200, 50, 50)
-  fill(blue);
-  line(100, 200, 300, 200)
+  fill('blue');
+  stroke(50);
   strokeWeight(5);
-  fill(blue);
+  ellipse(100, 200, 50, 50);
 
   // Creating right accelerator beam
-  ellipse(300, 200, 50, 50)
-  fill(red);
-  line(100, 200, 300, 200)
+  fill('red');
+  stroke(50);
   strokeWeight(5);
-  fill(red);
+  ellipse(300, 200, 50, 50);
+  line(100, 200, 300, 200);
 
   // Creating the grand particle
-  ellipse(200, 200, 20, 20)
+  fill('purple');
   stroke(50);
-  fill(purple);
-  
+  ellipse(200, 200, 20, 20);
 }
