@@ -165,6 +165,8 @@ function keyPressed() {
     mode2_ballY = height / 2;
     mode2_expanding = true;
     mode2_ellipseColor = [random(255), random(255), random(255)];
+    } else if (key === '3') {
+    mode = 3; // 👈 NEW MODE
   } else {
     // Reset ball state for mode 1
     ballSize = originalSize; // Reset the size of the ball to its original size
