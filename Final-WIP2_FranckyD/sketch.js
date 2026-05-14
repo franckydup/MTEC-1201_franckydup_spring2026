@@ -1,23 +1,30 @@
-// The Seven Spheres of Power
+// The Seven Spheres of Sorrow
 
-let gameState = "title";
-let currentLevel = 1;
-let globalWeight = 0;
-let playerWeight = 0;
-let thelnar;
-let sphere;
-let levelStarted = false;
-let levelStartTime = 0;
-let groundY = 650;
-let platforms = [];
-let movingPlatforms = [];
-let jumpSound;
-let titleMusic;
-let levelMusic = [];
-let currentMusic = null;
-let audioUnlocked = false;
-let shakeSound;
-let screenShake = 0;
+// Basic game state and level tracking
+let gameState = "title"; // current screen: title, level, win, or lose
+let currentLevel = 1; // current level number
+let globalWeight = 0; // game-wide weight factor used for difficulty scaling
+let playerWeight = 0; // weight applied to player movement and physics
+let thelnar; // player character object
+let sphere; // power sphere object
+let levelStarted = false; // true after the level initialization begins
+let levelStartTime = 0; // timestamp when the current level started
+let groundY = 650; // y position of the ground surface
+
+// Platform data for current level
+let platforms = []; // static platform list
+let movingPlatforms = []; // moving platform list
+
+// Sound and audio variables
+let jumpSound; // function or sound effect for jump
+let titleMusic; // sound for title screen music
+let levelMusic = []; // array of level-specific music tracks
+let currentMusic = null; // currently playing music track
+let audioUnlocked = false; // whether browser audio has been enabled
+let shakeSound; // function or sound effect for screen shake
+let screenShake = 0; // visual shake intensity for level 6
+
+// Level configuration data
 let levelNames = [
   "The Forgotten Departure",
   "The Scorched Regret",
@@ -38,6 +45,7 @@ let levelIntroText = [
   "Only silence remains. And the mirror."
 ];
 
+// Preload audio files so they are ready before setup() runs
 function preload() {
   soundFormats('mp3');
   titleMusic = loadSound('assets/music/Game Start Screen Music.mp3');
@@ -55,6 +63,7 @@ function preload() {
   }
 }
 
+// Stop whatever music is currently playing before a new track starts
 function stopCurrentMusic() {
   if (currentMusic && currentMusic.isPlaying()) {
     currentMusic.stop();
@@ -62,6 +71,7 @@ function stopCurrentMusic() {
   currentMusic = null;
 }
 
+// Choose the correct music track depending on the current game state
 function playMusicForState() {
   if (!audioUnlocked && typeof userStartAudio === 'function') {
     return;
@@ -85,6 +95,7 @@ function playMusicForState() {
   }
 }
 
+// setup() runs once at the start to set up the canvas and game objects
 function setup() {
   createCanvas(800, 700);
   thelnar = new Thelnar(width * 0.2, groundY - 80);
@@ -117,6 +128,7 @@ function setup() {
   };
 }
 
+// Enable browser audio once the player interacts with the game
 function enableAudio() {
   if (audioUnlocked) {
     return;
@@ -142,6 +154,7 @@ function touchStarted() {
   enableAudio();
 }
 
+// The player character with movement, physics, and drawing logic
 class Thelnar {
   constructor(x, y) {
     this.startX = x;
@@ -167,6 +180,7 @@ class Thelnar {
     this.jumpReady = true;
   }
 
+  // Read player input and convert it to horizontal movement and jump behavior
   applyInput() {
     let targetVX = 0;
     if (keyIsDown(LEFT_ARROW) || keyIsDown(65)) {
@@ -176,8 +190,9 @@ class Thelnar {
       targetVX += this.maxSpeed;
     }
 
-    let lagFactor = lerp(0.1, 0.65, playerWeight);
-    this.vx = lerp(this.vx, targetVX, 1 - lagFactor);
+    // Smooth the player's velocity based on current weight
+    let lagFactor = 0.1 + (0.65 - 0.1) * playerWeight;
+    this.vx = this.vx + (targetVX - this.vx) * (1 - lagFactor);
 
     let pressJump = keyIsDown(UP_ARROW) || keyIsDown(87);
     if (pressJump && this.onGround() && this.jumpReady) {
@@ -198,6 +213,7 @@ class Thelnar {
     }
   }
 
+  // Apply gravity, friction, and collision detection each frame
   applyPhysics() {
     this.vy += this.gravity;
     this.vx *= this.friction;
@@ -247,38 +263,35 @@ class Thelnar {
     this.applyPhysics();
   }
 
+  // Draw the player character using only basic coordinates and shapes
   draw() {
-    push();
-    translate(this.x, this.y);
-    // Level 5 effect - sprite becomes translucent
+    // Draw the player body at its current position
+    let x0 = this.x;
+    let y0 = this.y;
+    let alpha = 255;
     if (currentLevel === 5) {
-      let alpha = 255 * (0.5 + 0.5 * sin(frameCount * 0.05));
-      push();
-      drawingContext.globalAlpha = alpha / 255;
+      alpha = 255 * (0.5 + 0.5 * sin(frameCount * 0.05));
     }
     noStroke();
-    fill(240, 180, 80);
-    ellipse(0, -16, 28, 32);
-    fill(50, 20, 20);
-    ellipse(-6, -22, 8, 8);
-    ellipse(6, -22, 8, 8);
-    stroke(240, 200, 120);
+    fill(240, 180, 80, alpha);
+    ellipse(x0, y0 - 16, 28, 32);
+    fill(50, 20, 20, alpha);
+    ellipse(x0 - 6, y0 - 22, 8, 8);
+    ellipse(x0 + 6, y0 - 22, 8, 8);
+    stroke(240, 200, 120, alpha);
     strokeWeight(8);
-    line(-10, 0, -18, 16);
-    line(10, 0, 18, 16);
-    line(-8, 10, -12, 28);
-    line(8, 10, 12, 28);
+    line(x0 - 10, y0, x0 - 18, y0 + 16);
+    line(x0 + 10, y0, x0 + 18, y0 + 16);
+    line(x0 - 8, y0 + 10, x0 - 12, y0 + 28);
+    line(x0 + 8, y0 + 10, x0 + 12, y0 + 28);
     noStroke();
-    fill(120, 180, 220);
+    fill(120, 180, 220, alpha);
     rectMode(CENTER);
-    rect(0, 10, 28, 36, 8);
-    if (currentLevel === 5) {
-      pop();
-    }
-    pop();
+    rect(x0, y0 + 10, 28, 36, 8);
   }
 }
 
+// The moving sphere that affects player gravity and friction
 class Sphere {
   constructor(x, y, radius, color = [120, 220, 255], movementType = 'orbit') {
     this.x = x;
@@ -328,11 +341,13 @@ class Sphere {
     }
   }
 
+  // Apply sphere influence to the player when they are nearby
   applyTo(player) {
     let distance = dist(this.x, this.y, player.x, player.y);
     let influence = constrain(1 - (distance - this.radius) / (this.radius * 2), 0, 1);
     if (distance < this.radius * 1.4) {
-      player.gravity = player.baseGravity * lerp(0.7, 1, 1 - influence);
+      let gravityFactor = 0.7 + (1 - 0.7) * (1 - influence);
+      player.gravity = player.baseGravity * gravityFactor;
       player.friction = player.baseFriction + 0.02 * influence;
     } else {
       player.gravity = player.baseGravity + playerWeight * 0.4;
@@ -340,9 +355,9 @@ class Sphere {
     }
   }
 
+  // Draw the sphere with layered circles for visual detail
   draw() {
     noStroke();
-    let glow = map(sin(frameCount * 0.06), -1, 1, 80, 160);
     let c = this.color;
     fill(c[0], c[1], c[2], 80);
     ellipse(this.x, this.y, this.radius * 2.6);
@@ -359,19 +374,13 @@ class Sphere {
   }
 }
 
+// Main draw loop called every frame to update and display the game
 function draw() {
   playMusicForState();
-  // Level 6 screen shake effect
-  let shakeX = 0;
-  let shakeY = 0;
+  // Level 6 screen shake is no longer using transform helpers
   if (currentLevel === 6 && screenShake > 0) {
-    shakeX = random(-screenShake, screenShake);
-    shakeY = random(-screenShake, screenShake);
     screenShake -= 0.5;
   }
-  
-  push();
-  translate(shakeX, shakeY);
   background(12, 10, 24);
   if (gameState === 'title') {
     drawTitle();
@@ -394,14 +403,14 @@ function draw() {
   } else if (gameState === 'lose') {
     drawLoseScreen();
   }
-  pop();
 }
 
+// Draw the title screen with instructions before the game begins
 function drawTitle() {
   fill(255);
   textAlign(CENTER);
   textSize(52);
-  text('The Seven Spheres of Power', width / 2, height / 2 - 40);
+  text('The Seven Spheres of Sorrow', width / 2, height / 2 - 40);
   textSize(18);
   text('WASD or Arrow keys to move. Stay close to the sphere to power up.', width / 2, height / 2 + 20);
   text('Press SPACE to begin.', width / 2, height / 2 + 70);
@@ -411,6 +420,7 @@ function drawTitle() {
   }
 }
 
+// Set up the game state and platforms for a new level
 function initializeLevel(level) {
   currentLevel = level;
   gameState = 'LEVEL_' + level;
@@ -536,8 +546,12 @@ function updateLevelParameters() {
 
 function drawLevelEnvironment(level) {
   noStroke();
-  let sky = lerpColor(color(12, 10, 24), color(70, 40, 110), level / 7);
-  background(sky);
+  // Create a simple sky color gradient using arithmetic instead of helper functions
+  let t = level / 7;
+  let skyR = 12 + (70 - 12) * t;
+  let skyG = 10 + (40 - 10) * t;
+  let skyB = 24 + (110 - 24) * t;
+  background(skyR, skyG, skyB);
   
   // Level-specific background visuals
   if (level === 1) {
