@@ -117,7 +117,7 @@ function enableAudio() {
   playMusicForState(); 
 } 
 
-// Thelnar's characteristics and behavior
+// Thelnar
 class Thelnar { 
   constructor(x, y) { 
     this.startX = x; 
@@ -800,7 +800,7 @@ function drawLoseScreen() {
   text('Press R to retry the level.', width / 2, height / 2 + 20); 
 }
 
-// Global keyboard input for title, win, and lose screens
+// Global key input for title, win, and lose screens
 function keyPressed() { 
   enableAudio(); 
   if (screen === 'title' && keyCode === 32) { 
