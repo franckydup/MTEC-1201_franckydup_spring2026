@@ -9,9 +9,7 @@
 
 
 // Game state and level tracking ---
-// Global variables to keep track of the current screen and level
-// Difficulty scaling, and the current player and sphere objects.
-let gameState = "title"; // current screen: title, level, win, or lose
+let screen = "title"; // current screen: title, level, win, or lose
 let currentLevel = 1; // 
 let globalWeight = 0; // game-wide weight factor used for difficulty scaling
 let playerWeight = 0; // weight applied to player movement and physics
@@ -21,18 +19,15 @@ let levelStarted = false;
 let levelStartTime = 0;  
 let groundY = 650; // y position of the ground surface
 
-// Platforms!!
-// platforms: static floor pieces, movingPlatforms: animated platforms
+// Platforms!! static floor pieces, movingPlatforms: animated platforms
 let platforms = []; 
 let movingPlatforms = [];
 
 // Sound and audio 
-let jumpSound; 
 let titleMusic;
 let levelMusic = []; // array of level-specific music tracks
 let currentMusic = null; // currently playing music track
 let audioUnlocked = false; // whether browser audio has been enabled
-let shakeSound; 
 let screenShake = 0; 
 
 // Levels!!!
@@ -59,7 +54,7 @@ let levelIntroText = [
 
 function preload() { 
   soundFormats('mp3'); 
-  titleMusic = loadSound('assets/music/Game Start Screen Music.mp3'); // execute this statement
+  titleMusic = loadSound('assets/music/Game Start Screen Music.mp3'); 
   let levelFiles = [ 
     'The Forgotten Departure.mp3', 
     'The Scorched Regret.mp3', 
@@ -69,28 +64,28 @@ function preload() {
     'The Weight of the World.mp3', 
     'The Mirror of Truth.mp3' 
   ];
-  for (let i = 0; i < levelFiles.length; i++) { // loop iteration
+  for (let i = 0; i < levelFiles.length; i++) { 
     levelMusic[i] = loadSound('assets/music/' + levelFiles[i]);
   } 
 } 
 
 // Stop whatever music is currently playing before a new track starts
 function stopCurrentMusic() { 
-  if (currentMusic && currentMusic.isPlaying()) { // conditional check
+  if (currentMusic && currentMusic.isPlaying()) { 
     currentMusic.stop(); 
-  } // statement
+  } 
   currentMusic = null; 
 } 
 
 function playMusicForState() { 
-  if (!audioUnlocked && typeof userStartAudio === 'function') { 
+  if (!audioUnlocked) { 
     return; 
   } 
-  let nextMusic = null; // initialize nextMusic
-  if (gameState === 'title') { 
+  let nextMusic = null; 
+  if (screen === 'title') { 
     nextMusic = titleMusic; 
-  } else if (gameState.startsWith('LEVEL_')) { 
-    let levelIndex = int(gameState.split('_')[1]) - 1;  // For separating out levels for sound purposes
+  } else if (screen === 'level') { 
+    let levelIndex = currentLevel - 1;  // For separating out levels for sound purposes
     if (levelIndex >= 0 && levelIndex < levelMusic.length) { 
       nextMusic = levelMusic[levelIndex]; 
     } 
@@ -110,32 +105,6 @@ function setup() {
   thelnar = new Thelnar(width * 0.2, groundY - 80); 
   sphere = new Sphere(width * 0.7, height * 0.35, 100); 
   playMusicForState(); 
-
-  // Create jump sound using oscillator
-  jumpSound = function() {
-    let freq = 400; 
-    let dur = 0.1; 
-    let osc = new p5.Oscillator(); 
-    let env = new p5.Envelope(); 
-    osc.setType('sine'); 
-    osc.freq(freq); 
-    osc.amp(env); 
-    env.setADSR(0.01, dur, 0, 0.01); 
-    osc.start(); 
-    env.play(); 
-    osc.stop(getAudioContext().currentTime + dur); 
-  };
-
-  shakeSound = function() { 
-    let osc = new p5.Oscillator('triangle'); 
-    let env = new p5.Envelope(); 
-    osc.freq(160); 
-    osc.amp(env); 
-    env.setADSR(0.001, 0.06, 0.0, 0.08); 
-    osc.start(); 
-    env.play(); 
-    osc.stop(getAudioContext().currentTime + 0.18); 
-  }; 
 } 
 
 // Enable browser audio once the player interacts with the game
@@ -143,18 +112,9 @@ function enableAudio() {
   if (audioUnlocked) { 
     return;
   } 
-  if (typeof userStartAudio === 'function') { 
-    userStartAudio(); 
-    audioUnlocked = true; 
-    playMusicForState(); 
-  } else {
-    audioUnlocked = true; 
-    playMusicForState(); 
-  } 
-} 
-
-function mousePressed() { 
-  enableAudio();
+  userStartAudio(); 
+  audioUnlocked = true; 
+  playMusicForState(); 
 } 
 
 // Thelnar's characteristics and behavior
@@ -197,22 +157,19 @@ class Thelnar {
     } 
 
     // Smooth the player's velocity based on current weight
-    let lagFactor = 0.1 + (0.65 - 0.1) * playerWeight;
-    this.vx = this.vx + (targetVX - this.vx) * (1 - lagFactor); 
+    let responsiveness = 0.9 - (playerWeight * 0.5);
+    if (responsiveness < 0.2) {
+      responsiveness = 0.2;
+    }
+    this.vx = this.vx * (1 - responsiveness) + targetVX * responsiveness; 
 
     let pressJump = keyIsDown(UP_ARROW) || keyIsDown(87);
     if (pressJump && this.onGround() && this.jumpReady) { 
       this.vy = -this.jumpForce; 
       this.jumpReady = false; 
-      if (jumpSound && typeof jumpSound === 'function') { 
-        jumpSound(); 
-      } 
-      if (currentLevel === 6) { 
-        screenShake = 3; 
-        if (shakeSound && typeof shakeSound === 'function') { 
-          shakeSound(); 
-        } 
-      } 
+      if (currentLevel === 6) {
+        screenShake = 3;
+      }
     } 
     if (!pressJump) { 
       this.jumpReady = true; 
@@ -223,9 +180,15 @@ class Thelnar {
   applyPhysics() { 
     this.prevX = this.x; 
     this.prevY = this.y; 
+    this.moveWithMovingPlatforms();
     this.vy += this.gravity; 
     this.vx *= this.friction; 
-    this.vx = constrain(this.vx, -this.maxSpeed * 1.2, this.maxSpeed * 1.2); 
+    let maxVX = this.maxSpeed * 1.2; 
+    if (this.vx < -maxVX) { 
+      this.vx = -maxVX; 
+    } else if (this.vx > maxVX) { 
+      this.vx = maxVX; 
+    } 
     this.y += this.vy; 
     this.x += this.vx; 
 
@@ -246,7 +209,8 @@ class Thelnar {
     let currBottom = this.y + this.radius;
 
     // Platform collision
-    for (let p of platforms) { 
+    for (let i = 0; i < platforms.length; i++) { 
+      let p = platforms[i]; 
       if (this.vy > 0 && prevBottom <= p.y && currBottom >= p.y && this.x + this.radius > p.x && this.x - this.radius < p.x + p.w) { 
         this.y = p.y - this.radius; 
         this.vy = 0; 
@@ -255,25 +219,61 @@ class Thelnar {
     } 
 
     // Moving platform collision
-    for (let p of movingPlatforms) { 
+    for (let i = 0; i < movingPlatforms.length; i++) { 
+      let p = movingPlatforms[i]; 
       if (this.vy > 0 && prevBottom <= p.y && currBottom >= p.y && this.x + this.radius > p.x && this.x - this.radius < p.x + p.w) { // conditional check
         this.y = p.y - this.radius; 
         this.vy = 0; 
-        break; // break out of loop or switch
+        break; 
       } 
     } 
   } 
 
   onGround() { 
     let onGroundLevel = this.y + this.radius >= groundY - 1; 
-    let onPlatform = platforms.some(p => this.y + this.radius >= p.y - 1 && this.y + this.radius <= p.y + 2 && this.x + this.radius > p.x && this.x - this.radius < p.x + p.w);
-    let onMovingPlatform = movingPlatforms.some(p => this.y + this.radius >= p.y - 1 && this.y + this.radius <= p.y + 2 && this.x + this.radius > p.x && this.x - this.radius < p.x + p.w); 
+    let onPlatform = false; 
+    for (let i = 0; i < platforms.length; i++) { 
+      let p = platforms[i]; 
+      if (this.y + this.radius >= p.y - 1 && this.y + this.radius <= p.y + 2 && this.x + this.radius > p.x && this.x - this.radius < p.x + p.w) { 
+        onPlatform = true; 
+        break; 
+      } 
+    } 
+    let onMovingPlatform = false; 
+    for (let i = 0; i < movingPlatforms.length; i++) { 
+      let p = movingPlatforms[i]; 
+      if (this.y + this.radius >= p.y - 1 && this.y + this.radius <= p.y + 2 && this.x + this.radius > p.x && this.x - this.radius < p.x + p.w) { 
+        onMovingPlatform = true; 
+        break; 
+      } 
+    } 
     return onGroundLevel || onPlatform || onMovingPlatform; 
   } 
 
   update() { 
     this.applyInput(); 
     this.applyPhysics(); 
+  } 
+
+  moveWithMovingPlatforms() { 
+    let feetY = this.y + this.radius; 
+    for (let i = 0; i < movingPlatforms.length; i++) { 
+      let p = movingPlatforms[i]; 
+      let onTop = feetY >= p.y - 1 && feetY <= p.y + 2 && this.x + this.radius > p.x && this.x - this.radius < p.x + p.w; 
+      if (onTop) { 
+        let dx = 0; 
+        let dy = 0; 
+        if (p.prevX !== undefined) { 
+          dx = p.x - p.prevX; 
+        } 
+        if (p.prevY !== undefined) { 
+          dy = p.y - p.prevY; 
+        } 
+        this.x += dx; 
+        this.y += dy; 
+        break; 
+      } 
+    } 
   } 
 
   // Draw the player character 
@@ -356,7 +356,12 @@ class Sphere {
   // Apply sphere influence to the player when they are nearby
   applyTo(player) { // statement
     let distance = dist(this.x, this.y, player.x, player.y); 
-    let influence = constrain(1 - (distance - this.radius) / (this.radius * 2), 0, 1);
+    let influence = 1 - (distance - this.radius) / (this.radius * 2);
+    if (influence < 0) {
+      influence = 0;
+    } else if (influence > 1) {
+      influence = 1;
+    }
     if (distance < this.radius * 1.4) {
       let gravityFactor = 0.7 + (1 - 0.7) * (1 - influence); 
       player.gravity = player.baseGravity * gravityFactor; 
@@ -392,24 +397,14 @@ function draw() {
     screenShake -= 0.5; 
   } 
   background(12, 10, 24); 
-  if (gameState === 'title') { 
+  if (screen === 'title') { 
     drawTitle(); 
-  } else if (gameState === 'LEVEL_1') {
-    playLevelOne(); 
-  } else if (gameState === 'LEVEL_2') { 
-    playLevelTwo(); 
-  } else if (gameState === 'LEVEL_3') { 
-    playLevelThree();
-  } else if (gameState === 'LEVEL_4') { 
-    playLevelFour(); 
-  } else if (gameState === 'LEVEL_5') { 
-    playLevelFive(); 
-  } else if (gameState === 'LEVEL_6') { 
-    playLevelSix(); 
-  } else if (gameState === 'LEVEL_7') { 
-    playLevelSeven(); 
-  } else if (gameState === 'win') { 
+  } else if (screen === 'level') { 
+    runLevel(currentLevel); 
+  } else if (screen === 'win') { 
     drawWinScreen(); 
+  } else if (screen === 'lose') { 
+    drawLoseScreen(); 
   } 
 } 
 
@@ -422,7 +417,7 @@ function drawTitle() {
   textSize(18); 
   text('WASD or Arrow keys to move. Stay close to the sphere to power up.', width / 2, height / 2 + 20); 
   text('Press SPACE to begin.', width / 2, height / 2 + 70); 
-  if (!audioUnlocked && typeof userStartAudio === 'function') { 
+  if (!audioUnlocked) { 
     textSize(16); 
     text('Click or press any key to enable sound.', width / 2, height / 2 + 110); 
   } 
@@ -432,10 +427,16 @@ function drawTitle() {
 // Prepares the level layout, sphere behavior, and player reset.
 function initializeLevel(level) { 
   currentLevel = level; 
-  gameState = 'LEVEL_' + level; 
+  screen = 'level';
   levelStarted = true; 
   levelStartTime = millis(); 
-  globalWeight = constrain((level - 1) / 6, 0, 1);
+  let weightValue = (level - 1) / 6;
+  if (weightValue < 0) { 
+    weightValue = 0; 
+  } else if (weightValue > 1) { 
+    weightValue = 1; 
+  }
+  globalWeight = weightValue;
   playerWeight = globalWeight; 
   thelnar.reset(); 
   playMusicForState(); 
@@ -545,7 +546,7 @@ function initializeLevel(level) {
 // Restart the game from the very beginning without exiting the program
 function restartGame() { 
   currentLevel = 1; 
-  gameState = 'title'; 
+  screen = 'title'; 
   levelStarted = false; 
   levelStartTime = 0; 
   globalWeight = 0; 
@@ -562,14 +563,24 @@ function startOver() {
 
 // Update level-dependent physics parameters based on current level
 function updateLevelParameters() { 
-  playerWeight = constrain((currentLevel - 1) / 10, 0, 1); 
+  playerWeight = (currentLevel - 1) / 10; 
+  if (playerWeight < 0) { 
+    playerWeight = 0; 
+  } else if (playerWeight > 1) { 
+    playerWeight = 1; 
+  } 
   globalWeight = playerWeight; 
 
-  let speedScale = 1 - 0.15 * min(1, (currentLevel - 1) / 6); 
-  thelnar.maxSpeed = thelnar.baseMaxSpeed * speedScale * (1 - playerWeight * 0.03); 
-  thelnar.jumpForce = thelnar.baseJumpForce * max(0.35, 1 - 0.3 * min(1, (currentLevel - 1) / 6)); 
-  thelnar.baseGravity = 0.6 + playerWeight * 0.2; 
-  thelnar.baseFriction = 0.95 - playerWeight * 0.05; 
+  let levelModifier = (currentLevel - 1) / 6;
+  if (levelModifier < 0) {
+    levelModifier = 0;
+  } else if (levelModifier > 1) {
+    levelModifier = 1;
+  }
+  thelnar.maxSpeed = thelnar.baseMaxSpeed * (1 - levelModifier * 0.15); 
+  thelnar.jumpForce = thelnar.baseJumpForce * (1 - levelModifier * 0.3); 
+  thelnar.baseGravity = 0.6 + (playerWeight * 0.2); 
+  thelnar.baseFriction = 0.96 - (playerWeight * 0.06); 
 } 
 
 // Draw the level environment
@@ -615,7 +626,12 @@ function drawLevelEnvironment(level) {
     text('...long conversations...', 500, 250);
   } else if (level === 4) { 
     // Neon High-Rises - desaturating colors, high contrast
-    let saturation = constrain(1 - playerWeight * 0.7, 0.3, 1); 
+    let saturation = 1 - playerWeight * 0.7; 
+    if (saturation < 0.3) { 
+      saturation = 0.3; 
+    } else if (saturation > 1) { 
+      saturation = 1; 
+    } 
     fill(255 * saturation, 100 * saturation, 150 * saturation, 100); 
     for (let i = 0; i < 8; i++) { 
       rect(i * 100, 0, 80, height * 0.6); 
@@ -659,15 +675,15 @@ function drawLevelEnvironment(level) {
   // Draw platforms
   rectMode(CORNER); 
   fill(60, 50, 70); 
-  for (let p of platforms) { // loop iteration
+  for (let i = 0; i < platforms.length; i++) { // loop iteration
+    let p = platforms[i]; 
     rect(p.x, p.y, p.w, p.h); 
   } 
   
-  // Update and draw moving platforms
+  // Draw moving platforms
   fill(70, 60, 90); 
-  for (let p of movingPlatforms) { // loop iteration
-    p.x = p.baseX + p.moveX * sin(frameCount * p.speedX); 
-    p.y = p.baseY + p.moveY * sin(frameCount * p.speedY); 
+  for (let i = 0; i < movingPlatforms.length; i++) { 
+    let p = movingPlatforms[i]; 
     rect(p.x, p.y, p.w, p.h); 
   } 
   
@@ -688,6 +704,34 @@ function drawLevelEnvironment(level) {
   noStroke(); 
 } 
 
+function updateMovingPlatforms() {
+  for (let i = 0; i < movingPlatforms.length; i++) {
+    let p = movingPlatforms[i];
+    if (p.prevX === undefined) {
+      p.prevX = p.x;
+      p.prevY = p.y;
+    } else {
+      p.prevX = p.x;
+      p.prevY = p.y;
+    }
+    let rawX = sin(frameCount * p.speedX);
+    let rawY = sin(frameCount * p.speedY);
+    let holdThreshold = 0.92;
+    if (rawX > holdThreshold) {
+      rawX = 1;
+    } else if (rawX < -holdThreshold) {
+      rawX = -1;
+    }
+    if (rawY > holdThreshold) {
+      rawY = 1;
+    } else if (rawY < -holdThreshold) {
+      rawY = -1;
+    }
+    p.x = p.baseX + p.moveX * rawX;
+    p.y = p.baseY + p.moveY * rawY;
+  }
+}
+
 // Run one level: initialize it, show intro text, then update gameplay each frame
 function runLevel(level) { 
   if (!levelStarted) { 
@@ -704,6 +748,7 @@ function runLevel(level) {
     return; 
   } 
 
+  updateMovingPlatforms();
   updateLevelParameters(); 
   sphere.update(); 
   sphere.applyTo(thelnar);
@@ -725,19 +770,16 @@ function runLevel(level) {
   noFill(); 
   ellipse(sphere.x, sphere.y, sphere.radius * 2.6); 
 
+  if (thelnar.y > height + 40) { 
+    screen = 'lose'; 
+    levelStarted = false; 
+  } 
+
   if (thelnar.powerTime >= levelPowerGoal[level - 1]) { 
-    gameState = 'win'; 
+    screen = 'win'; 
     levelStarted = false; 
   } 
 } 
-
-function playLevelOne() { runLevel(1); } 
-function playLevelTwo() { runLevel(2); } 
-function playLevelThree() { runLevel(3); } 
-function playLevelFour() { runLevel(4); } 
-function playLevelFive() { runLevel(5); } 
-function playLevelSix() { runLevel(6); } 
-function playLevelSeven() { runLevel(7); } 
 
 // Draw the win screen shown after the player completes the level goal
 function drawWinScreen() { 
@@ -749,25 +791,36 @@ function drawWinScreen() {
   text('Press N for next level, or R to restart from the beginning.', width / 2, height / 2 + 20); 
 }
 
+function drawLoseScreen() { 
+  fill(255, 180, 180); 
+  textAlign(CENTER); 
+  textSize(50); 
+  text('The Weight Crushes You', width / 2, height / 2 - 40); 
+  textSize(22); 
+  text('Press R to retry the level.', width / 2, height / 2 + 20); 
+}
+
 // Global keyboard input for title, win, and lose screens
 function keyPressed() { 
   enableAudio(); 
-  if (gameState === 'title' && keyCode === 32) { 
-    gameState = 'LEVEL_1'; 
+  if (screen === 'title' && keyCode === 32) { 
+    screen = 'level';
+    currentLevel = 1;
     levelStarted = false; 
     return; 
   } 
-  if (gameState !== 'title' && (key === 't' || key === 'T')) { 
+  if (screen !== 'title' && (key === 't' || key === 'T')) { 
     startOver(); 
     return; 
   } 
-  if (gameState === 'win') { 
+  if (screen === 'win') { 
     if (key === 'n' || key === 'N') { 
       if (currentLevel < 7) { 
-        gameState = 'LEVEL_' + (currentLevel + 1); 
+        currentLevel += 1; 
+        screen = 'level'; 
         levelStarted = false; 
       } else { 
-        gameState = 'title'; 
+        screen = 'title'; 
         playMusicForState(); 
       } 
       return; 
@@ -776,5 +829,9 @@ function keyPressed() {
       startOver(); 
       return; 
     } 
+  } 
+  if (screen === 'lose' && (key === 'r' || key === 'R')) { 
+    levelStarted = false; 
+    return; 
   } 
 } 
